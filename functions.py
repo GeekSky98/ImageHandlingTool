@@ -1,20 +1,29 @@
+# Import required libraries
 import matplotlib.pyplot as plt
 from tensorflow import keras
 import numpy as np
 import math
 from tensorflow.keras.utils import Sequence
+import tensorflow as tf
+from skimage import color
+from skimage.transform import resize
 
-def show(image):
-    plt.imshow(image)
-    plt.grid(True)
-    plt.colorbar()
-    plt.show()
+# Import custom functions
+import functions
 
-def gray_show(image):
-    plt.imshow(image, cmap = "gray")
-    plt.grid(True)
-    plt.colorbar()
-    plt.show()
+# Temporary def / Modification required(grid, print, etc)
+def predict_color(model, image, img_height, img_width):
+    if image.mode == "RGB":
+        image = np.array(image)
+        if image.shape[-1] == 3:
+            image = color.rgb2gray(image)
+        image = resize(image, (img_height, img_width))
+        image = image.reshape(1, img_height, img_width, 1)
+    else:
+        print("fail")
+        pass
+    res = model.predict(image)
+    functions.show(res[0])
 
 # Make learning rate warmup and cosine decay
 class CustomSchedule(keras.optimizers.schedules.LearningRateSchedule):
@@ -54,3 +63,16 @@ class Dataloader(Sequence):
         self.indices = np.arange(len(self.x))
         if self.shuffle == True:
             np.random.shuffle(self.indices)
+
+# Show result image fastly
+def show(image):
+    plt.imshow(image)
+    plt.grid(True)
+    plt.colorbar()
+    plt.show()
+
+def gray_show(image):
+    plt.imshow(image, cmap = "gray")
+    plt.grid(True)
+    plt.colorbar()
+    plt.show()
