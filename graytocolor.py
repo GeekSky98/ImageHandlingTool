@@ -196,4 +196,17 @@ print(f"loss : {loss} / acc : {acc}")
 
 model_unet.save("./test_model.h5", include_optimizer = False)
 
-# Need to change image size to standard of phone camera
+# using LAB color
+
+image_lab = np.array([np.array(Image.open(os.path.join(y_dir, image))) for image in y_image_files])
+
+image_lab = color.rgb2lab(image_lab)
+image_lab_normal = image_lab + [0, 128, 128]
+image_lab_normal = image_lab_normal / [100., 255., 255.]
+
+train_x_lab, val_x_lab, train_y_lab, val_y_lab = train_test_split(
+  image_lab_normal[...,:1], image_lab_normal[...,1:], test_size = 0.1, shuffle = True, random_state = 32
+)
+
+train_lab_ds = functions.Dataloader(train_x_lab, train_y_lab, n_batch, shuffle = True)
+validation_lab_ds = functions.Dataloader(val_x_lab, val_y_lab, n_batch)
