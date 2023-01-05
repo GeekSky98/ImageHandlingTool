@@ -197,16 +197,100 @@ print(f"loss : {loss} / acc : {acc}")
 model_unet.save("./test_model.h5", include_optimizer = False)
 
 # using LAB color
-
+# Load color data
 image_lab = np.array([np.array(Image.open(os.path.join(y_dir, image))) for image in y_image_files])
 
+# Convert RGB image to LAB image
 image_lab = color.rgb2lab(image_lab)
+
+# LAB image data Nomalization
 image_lab_normal = image_lab + [0, 128, 128]
 image_lab_normal = image_lab_normal / [100., 255., 255.]
 
+# Separating L and AB and Making train / validation datasets
 train_x_lab, val_x_lab, train_y_lab, val_y_lab = train_test_split(
   image_lab_normal[...,:1], image_lab_normal[...,1:], test_size = 0.1, shuffle = True, random_state = 32
 )
 
+# Make a custon dataset
 train_lab_ds = functions.Dataloader(train_x_lab, train_y_lab, n_batch, shuffle = True)
 validation_lab_ds = functions.Dataloader(val_x_lab, val_y_lab, n_batch)
+
+# Make Unet for LAB color image dataset
+def conv2d_block(x, channel):
+  x = Conv2D(channel, 3, padding="same")(x)
+  x = BatchNormalization()(x)
+  x = Activation("relu")(x)
+
+  x = Conv2D(channel, 3, padding="same")(x)
+  x = BatchNormalization()(x)
+  x = Activation("relu")(x)
+
+  return x
+
+def unet_lab():
+  inputs = Input((150, 150, 1))
+
+  con_1 = conv2d_block(inputs, 32)
+  pool_1 = MaxPool2D((2, 2))(con_1)
+  pool_1 = Dropout(0.1)(pool_1)
+
+  con_2 = conv2d_block(pool_1, 64)
+  pool_2 = MaxPool2D((2, 2))(con_2)
+  pool_2 = Dropout(0.1)(pool_2)
+
+  con_3 = conv2d_block(pool_2, 128)
+  pool_3 = MaxPool2D((2, 2))(con_3)
+  pool_3 = Dropout(0.1)(pool_3)
+
+  con_4 = conv2d_block(pool_3, 256)
+  pool_4 = MaxPool2D((2, 2))(con_4)
+  pool_4 = Dropout(0.1)(pool_4)
+
+  con_5 = conv2d_block(pool_4, 512)
+
+  unite_1 = Conv2DTranspose(256, 2, 2, output_padding=(0, 0))(con_5)
+  unite_1 = concatenate([unite_1, con_4])
+  unite_1 = Dropout(0.1)(unite_1)
+  unite_1_con = conv2d_block(unite_1, 256)
+
+  unite_2 = Conv2DTranspose(128, 2, 2, output_padding=(1, 1))(unite_1_con)
+  unite_2 = concatenate([unite_2, con_3])
+  unite_2 = Dropout(0.1)(unite_2)
+  unite_2_con = conv2d_block(unite_2, 128)
+
+  unite_3 = Conv2DTranspose(64, 2, 2, output_padding=(1, 1))(unite_2_con)
+  unite_3 = concatenate([unite_3, con_2])
+  unite_3 = Dropout(0.1)(unite_3)
+  unite_3_con = conv2d_block(unite_3, 64)
+
+  unite_4 = Conv2DTranspose(32, 2, 2, output_padding=(0, 0))(unite_3_con)
+  unite_4 = concatenate([unite_4, con_1])
+  unite_4 = Dropout(0.1)(unite_4)
+  unite_4_con = conv2d_block(unite_4, 32)
+
+  outputs = Conv2D(2, 1, activation="sigmoid")(unite_4_con)
+
+  model = Model(inputs, outputs)
+  return model
+
+model_unet_lab = unet_lab()
+
+model_unet_lab.compile(
+  loss = "mae",
+  optimizer = keras.optimizers.Adam(lr_schedule),
+  metrics = ["accuracy"]
+)
+
+model_unet_lab.fit(
+  train_lab_ds,
+  validation_data = validation_lab_ds,
+  epochs = n_epoch,
+  verbose = 1
+)
+
+loss, acc = model_unet_lab.evaluate(validation_lab_ds)
+
+# Use "functions.convert_lab_result" to view results
+
+model_unet_lab.save("./lab_model.h5", include_optimizer = False)
