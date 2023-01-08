@@ -84,7 +84,7 @@ def convert_lab_result(model, image, img_height = 150, img_width = 150):
             image = color.gray2rgb(image)
         image_color_resized = resize(image, (img_height, img_width))
         image_lab = color.rgb2lab(image_color_resized)[...,:1] / 100
-        res = model.predict(np.expand_dims(image_lab,0))
+        res = model.predict(np.expand_dims(image_lab, 0))
         mold_image = np.zeros((img_height, img_width, 3))
         mold_image[:,:,0] = image_lab.reshape(img_height, img_width)
         mold_image[:,:,1:] = res[0]
@@ -94,4 +94,18 @@ def convert_lab_result(model, image, img_height = 150, img_width = 150):
         print("This image isn't RGB form")
         pass
     functions.show(result)
+
+def resolution_color(model1, model2, image, img_height = 150, img_width = 150):
+    if image.mode =="RGB":
+        image = np.array(image)
+        if image.shape[-1] != 3:
+            print("This image isn't color image")
+        image_resized = resize(image, (img_height, img_width))
+        image_resized_expand = np.expand_dims(image_resized, 0)
+        result1 = model1.predict(image_resized_expand)
+        result2 = model2.predict(result1)
+        plt.imshow(np.concatenate([image, result1, result2]).transpose(1, 0, 2, 3).reshape(150, -1, 3))
+        plt.show()
+
+        return result2
 
