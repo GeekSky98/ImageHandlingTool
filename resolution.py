@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split
 import math
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from keras.layers import Conv2D, Conv2DTranspose, Input, Dropout, MaxPool2D, concatenate, Activation, \
-  BatchNormalization, GlobalAvgPool2D, Flatten, Reshape, Dense
+  BatchNormalization, GlobalAvgPool2D, Flatten, Reshape, Dense, Average
 from keras.models import Model, Sequential, load_model
 from tensorflow.keras.applications import *
 
@@ -51,7 +51,7 @@ for path in y_image_files:
 
 # Load data
 y = np.array([np.array(Image.open(os.path.join(y_dir, image))) for image in y_image_files])
-print(f"x_shape / y_shape : {x.shape, y.shape}")
+print(f"y_shape : {y.shape}")
 
 # Data scailing between 0 and 1
 y = y/y.max()
@@ -145,20 +145,36 @@ model_resolution.fit(
   verbose = 1
 )
 
+model_resolution.save("./resolution1.h5", include_optimizer = False)
+
+# Extract second data using the first model
+x_second = np.array([model_resolution.predict(np.expand_dims(img, 0)).reshape(150, 150, 3) for img in train_up])
+x_second = np.array(x_second)
+
+# Split train dataset and validation dataset
+train_x_second, val_x_second, train_y_second, val_y_second = train_test_split(
+  x_second, y, test_size = 0.1, shuffle = True, random_state = 32
+)
+
+# Make a Customdataset
+train_ds_second = functions.Dataloader(train_x_second, train_y_second, n_batch, shuffle = True)
+validation_ds_second = functions.Dataloader(val_x_second, val_y_second, n_batch)
+
 def unet_resolution2():
 
   inputs = Input((150, 150, 3))
 
   x = Conv2D(64, 9, activation="relu", padding = "same")(inputs)
   x1 = Conv2D(32, 1, activation="relu", padding="same")(x)
-  x1 = Conv2D(32, 3, activation="relu", padding="same")(x)
-  x1 = Conv2D(32, 5, activation="relu", padding="same")(x)
+  x2 = Conv2D(32, 3, activation="relu", padding="same")(x)
+  x3 = Conv2D(32, 5, activation="relu", padding="same")(x)
 
   x = Average()([x1,x2,x3])
 
-  outputs = Conv2D(3, 5, activation="relu", padding="same")
+  outputs = Conv2D(3, 5, activation="relu", padding="same")(x)
 
   model = Model(inputs, outputs)
+  return model
 
 model_resolution2 = unet_resolution2()
 
@@ -169,9 +185,10 @@ model_resolution2.compile(
 )
 
 model_resolution2.fit(
-  train_ds,
-  validation_data = validation_ds,
+  train_ds_second,
+  validation_data = validation_ds_second,
   epochs = n_epoch,
   verbose = 1
 )
 
+model_resolution2.save("./resolution2.h5", include_optimizer = False)
